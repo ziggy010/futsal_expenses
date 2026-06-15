@@ -1,0 +1,40 @@
+{
+  "projectName": "Futsal Ledger",
+  "currency": "Rs",
+  "deposits": [
+    { "id": "dep1", "date": "2026-05-15", "amount": 2500000, "note": "Opening fund (pooled in bank)" }
+  ],
+  "expenses": [
+    { "id": "e01", "date": "2026-05-23", "item": "Jagga dhani", "category": "misc", "amount": 15000, "note": "Land owner payment (5000 × 3)", "createdAt": 1000001 },
+    { "id": "e02", "date": "2026-05-23", "item": "Jagga ko likhit", "category": "misc", "amount": 3000, "note": "Land documentation writing", "createdAt": 1000002 },
+    { "id": "e03", "date": "2026-05-23", "item": "Jagga napne", "category": "misc", "amount": 5000, "note": "Land surveying", "createdAt": 1000003 },
+    { "id": "e04", "date": "2026-05-23", "item": "Dozer chalak", "category": "labor", "amount": 1000, "note": "Dozer driver", "createdAt": 1000004 },
+    { "id": "e05", "date": "2026-05-31", "item": "Block", "category": "materials", "amount": 17400, "note": "300 × 58", "createdAt": 1000005 },
+    { "id": "e06", "date": "2026-06-01", "item": "Sabel, pik, pid", "category": "equipment", "amount": 1650, "note": "Shovel, pickaxe & tools", "createdAt": 1000006 },
+    { "id": "e07", "date": "2026-06-01", "item": "Kawadi jasta, dandi", "category": "materials", "amount": 2600, "note": "Scrap tin sheet & rods", "createdAt": 1000007 },
+    { "id": "e08", "date": "2026-06-01", "item": "Gada", "category": "equipment", "amount": 4500, "note": "Cart", "createdAt": 1000008 },
+    { "id": "e09", "date": "2026-06-02", "item": "JCB", "category": "equipment", "amount": 37100, "note": "", "createdAt": 1000009 },
+    { "id": "e10", "date": "2026-06-02", "item": "Mini truck", "category": "transport", "amount": 4000, "note": "", "createdAt": 1000010 },
+    { "id": "e11", "date": "2026-06-02", "item": "Itta (bricks)", "category": "materials", "amount": 26000, "note": "Bricks", "createdAt": 1000011 },
+    { "id": "e12", "date": "2026-06-02", "item": "Itta (Ankit)", "category": "materials", "amount": 23500, "note": "Bricks from Ankit", "createdAt": 1000012 },
+    { "id": "e13", "date": "2026-06-02", "item": "Baluwa (sand)", "category": "materials", "amount": 36000, "note": "2 tippers, 400 cubic feet", "createdAt": 1000013 },
+    { "id": "e14", "date": "2026-06-02", "item": "Gitti (aggregate)", "category": "materials", "amount": 22000, "note": "2 tippers", "createdAt": 1000014 },
+    { "id": "e15", "date": "2026-06-02", "item": "Tractor (jasta bokna)", "category": "transport", "amount": 800, "note": "Carrying tin sheets", "createdAt": 1000015 },
+    { "id": "e16", "date": "2026-06-02", "item": "Plastic", "category": "materials", "amount": 200, "note": "", "createdAt": 1000016 },
+    { "id": "e17", "date": "2026-06-03", "item": "Tripal (tarpaulin)", "category": "materials", "amount": 1500, "note": "", "createdAt": 1000017 },
+    { "id": "e18", "date": "2026-06-03", "item": "Tractor pani", "category": "transport", "amount": 500, "note": "Tractor water", "createdAt": 1000018 },
+    { "id": "e19", "date": "2026-06-03", "item": "Karar patra", "category": "misc", "amount": 1500, "note": "Agreement papers (12 aana, 1.5 aana)", "createdAt": 1000019 },
+    { "id": "e20", "date": "2026-06-03", "item": "Subin thekedar jyala", "category": "labor", "amount": 10000, "note": "Contractor Subin wages", "createdAt": 1000020 },
+    { "id": "e21", "date": "2026-06-04", "item": "Block (2nd tip)", "category": "materials", "amount": 17400, "note": "2nd tipper", "createdAt": 1000021 },
+    { "id": "e22", "date": "2026-06-05", "item": "Doko", "category": "equipment", "amount": 800, "note": "Bamboo basket", "createdAt": 1000022 },
+    { "id": "e23", "date": "2026-06-05", "item": "Sajhedari karar patra", "category": "misc", "amount": 3000, "note": "Partnership agreement & 7 aana paper", "createdAt": 1000023 },
+    { "id": "e24", "date": "2026-06-12", "item": "Dozer chalauda khaja", "category": "misc", "amount": 1000, "note": "Food during dozer work", "createdAt": 1000024 },
+    { "id": "e25", "date": "2026-06-12", "item": "Dozer kharcha", "category": "misc", "amount": 2000, "note": "Paid by Sunil dai — needs to be returned", "createdAt": 1000025 },
+    { "id": "e26", "date": "2026-06-12", "item": "Dozer (6 hrs)", "category": "equipment", "amount": 16200, "note": "2700 × 6 hours", "createdAt": 1000026 },
+    { "id": "e27", "date": "2026-06-13", "item": "Tractor bhada", "category": "transport", "amount": 800, "note": "Brought tin sheets", "createdAt": 1000027 },
+    { "id": "e28", "date": "2026-06-13", "item": "Pipe roll", "category": "materials", "amount": 1860, "note": "For carrying water", "createdAt": 1000028 },
+    { "id": "e29", "date": "2026-06-13", "item": "Poll taar (3 poles)", "category": "materials", "amount": 7500, "note": "Wire for 3 poles — Pintu Enterprise", "createdAt": 1000029 },
+    { "id": "e30", "date": "2026-06-13", "item": "Poll gadi bhada", "category": "transport", "amount": 650, "note": "Pole transport", "createdAt": 1000030 },
+    { "id": "e31", "date": "2026-06-13", "item": "Poll weilding", "category": "labor", "amount": 700, "note": "Pole welding", "createdAt": 1000031 }
+  ]
+}
