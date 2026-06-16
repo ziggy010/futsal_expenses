@@ -1,2 +1,6 @@
 .DS_Store
 .claude/
+
+# Local data dumps — never publish these (data lives in Supabase)
+futsal-ledger-data.json
+backup-*.json

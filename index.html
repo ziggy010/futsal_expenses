@@ -1190,15 +1190,55 @@ function emptyState(title,msg,btnLabel){
   </div></div>`;
 }
 
+/* ===================== Password gate ===================== */
+/* Only people with the password can open the app. To change the password,
+   ask for a new SHA-256 hash and replace the value below.                */
+const APP_PASS_HASH = 'a89d43db39b3e09c95ebe625791824a547ed79ed401530c94cb443c0bfb4ba18';
+const UNLOCK_KEY = 'futsalLedger.unlocked';
+
+async function sha256(str){
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
+  return [...new Uint8Array(buf)].map(b=>b.toString(16).padStart(2,'0')).join('');
+}
+function startApp(){
+  renderNav();
+  render();
+  (async function connectCloud(){
+    try{ const ok = await cloudInit(); if(ok){ renderNav(); render(); } }
+    catch(err){ console.error(err); toast('Cloud offline — using local data','err'); }
+  })();
+}
+function buildGate(){
+  const g=document.createElement('div');
+  g.id='gate';
+  g.style.cssText='position:fixed;inset:0;z-index:500;background:var(--bg);display:grid;place-items:center;padding:24px';
+  g.innerHTML=`
+    <div style="width:100%;max-width:340px;text-align:center">
+      <div style="width:54px;height:54px;border-radius:15px;background:var(--accent);display:grid;place-items:center;margin:0 auto 18px;box-shadow:0 6px 18px oklch(0.74 0.165 158 / .35);color:var(--on-accent)">
+        ${svg('<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4" stroke-linecap="round"/>')}
+      </div>
+      <h2 style="font-family:'Poppins';font-weight:600;font-size:22px">${esc(state.projectName)}</h2>
+      <p style="color:var(--text-dim);font-size:14px;margin:7px 0 20px">Enter the password to continue</p>
+      <input id="gatePw" type="password" inputmode="text" autocomplete="current-password" placeholder="Password"
+        style="width:100%;padding:12px 14px;background:var(--surface);border:1px solid var(--border);border-radius:11px;color:var(--fg);outline:none;text-align:center;font-size:16px"/>
+      <div id="gateErr" style="color:oklch(0.72 0.18 25);font-size:13px;margin-top:10px;display:none">Wrong password, try again</div>
+      <button id="gateBtn" class="btn btn-primary" style="width:100%;margin-top:14px;justify-content:center">Unlock</button>
+    </div>`;
+  document.body.appendChild(g);
+  const inp=g.querySelector('#gatePw'), btn=g.querySelector('#gateBtn'), err=g.querySelector('#gateErr');
+  async function attempt(){
+    const h=await sha256(inp.value);
+    if(h===APP_PASS_HASH){ localStorage.setItem(UNLOCK_KEY,'1'); g.remove(); startApp(); }
+    else { err.style.display='block'; inp.value=''; inp.focus(); }
+  }
+  btn.onclick=attempt;
+  inp.addEventListener('keydown',e=>{ if(e.key==='Enter') attempt(); });
+  setTimeout(()=>inp.focus(),100);
+}
+
 /* ===================== Boot ===================== */
-renderNav();
-render();
-(async function connectCloud(){
-  try{
-    const ok = await cloudInit();
-    if(ok){ renderNav(); render(); }
-  }catch(err){ console.error(err); toast('Cloud offline — using local data','err'); }
-})();
+if(localStorage.getItem(UNLOCK_KEY)==='1') startApp();
+else buildGate();
 </script>
 </body>
 </html>
