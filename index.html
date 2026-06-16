@@ -1141,9 +1141,15 @@ document.addEventListener('keydown',e=>{ if(e.key==='Escape') closeModal(); });
 
 /* ===================== Export / Import ===================== */
 function download(name,content,type){
-  const blob=new Blob([content],{type}); const url=URL.createObjectURL(blob);
-  const a=document.createElement('a'); a.href=url; a.download=name; a.click();
-  setTimeout(()=>URL.revokeObjectURL(url),1000);
+  const blob=new Blob([content],{type});
+  // Older Edge/IE
+  if(window.navigator && window.navigator.msSaveOrOpenBlob){ window.navigator.msSaveOrOpenBlob(blob,name); return; }
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  a.href=url; a.download=name; a.rel='noopener'; a.style.display='none';
+  document.body.appendChild(a);   // must be in the DOM to click reliably (iOS Safari, Firefox)
+  a.click();
+  setTimeout(()=>{ if(a.parentNode) a.parentNode.removeChild(a); URL.revokeObjectURL(url); },1500);
 }
 function exportJSON(){
   download(`futsal-ledger-${todayStr()}.json`, JSON.stringify(state,null,2), 'application/json');
@@ -1177,7 +1183,7 @@ function importJSON(ev){
   };
   reader.readAsText(file); ev.target.value='';
 }
-$('#exportBtn').onclick=exportJSON;
+$('#exportBtn').onclick=exportCSV;
 $('#addBtn').onclick=openAddModal;
 
 /* ===================== Shared ===================== */
