@@ -246,6 +246,13 @@
   .rcpt-prev{display:flex;gap:12px;align-items:center}
   .rcpt-prev img{width:64px;height:64px;object-fit:cover;border-radius:10px;border:1px solid var(--border);flex:none}
   .rcpt-actions{display:flex;gap:7px;flex-wrap:wrap}
+  .pager{display:flex;justify-content:center;align-items:center;gap:8px;margin-top:16px;flex-wrap:wrap}
+  .pager-nums{display:flex;align-items:center;gap:5px;flex-wrap:wrap;justify-content:center}
+  .pager-num{min-width:34px;height:34px;padding:0 8px;border-radius:9px;font-weight:600;font-size:13.5px;
+    color:var(--text-dim);background:var(--surface-2);border:1px solid var(--border);transition:background .15s,color .15s,border-color .15s}
+  .pager-num:hover{background:var(--surface-3);color:var(--fg);border-color:var(--border-strong)}
+  .pager-num.active{background:var(--accent);color:var(--on-accent);border-color:transparent;cursor:default}
+  .pager-gap{min-width:24px;text-align:center;color:var(--text-dimmer);font-weight:600;user-select:none}
 
   /* ---------- Fund page rows ---------- */
   .fund-row{display:flex;align-items:center;gap:14px;padding:15px 4px;border-bottom:1px solid var(--border)}
@@ -721,6 +728,18 @@ function renderDashboard(){
   $('#seeAll').onclick=()=>go('expenses');
 }
 function stripCell(k,v,s){ return `<div class="cell"><div class="k">${k}</div><div class="v tnum">${v}</div><div class="s">${s}</div></div>`; }
+// Page numbers to show. Show every page when there aren't many;
+// only collapse with '…' gaps for large counts (e.g. 1 … 4 5 6 … 20).
+function pagerItems(current,total){
+  if(total<=7){ return Array.from({length:total},(_,i)=>i+1); }
+  const range=[]; for(let i=Math.max(2,current-1); i<=Math.min(total-1,current+1); i++) range.push(i);
+  const items=[1];
+  if(range[0]>2) items.push('…');
+  items.push(...range);
+  if(range[range.length-1]<total-1) items.push('…');
+  items.push(total);
+  return items;
+}
 
 function donut(data, tot){
   const R=70, C=2*Math.PI*R; let off=0;
@@ -794,10 +813,14 @@ function renderExpenses(){
       <span>Showing ${pageStart}-${pageEnd} of ${totalEntries} ${totalEntries===1?'entry':'entries'}${active?' (filtered)':''}</span>
       <span>Shown total: <strong style="color:var(--fg)" class="tnum">${cur(shownTotal)}</strong></span>
     </div>
-    ${totalPages>1? `<div style="display:flex;justify-content:flex-end;align-items:center;gap:10px;margin-top:14px">
-      <button class="btn btn-ghost btn-sm" id="prevPage" ${filters.page===1?'style="opacity:.45;pointer-events:none"':''}>Previous</button>
-      <span style="color:var(--text-dim);font-size:13px">Page ${filters.page} of ${totalPages}</span>
-      <button class="btn btn-ghost btn-sm" id="nextPage" ${filters.page===totalPages?'style="opacity:.45;pointer-events:none"':''}>Next</button>
+    ${totalPages>1? `<div class="pager">
+      <button class="btn btn-ghost btn-sm" id="prevPage" ${filters.page===1?'style="opacity:.4;pointer-events:none"':''}>Prev</button>
+      <div class="pager-nums">
+        ${pagerItems(filters.page,totalPages).map(p=> p==='…'
+          ? `<span class="pager-gap">…</span>`
+          : `<button class="pager-num${p===filters.page?' active':''}" data-page="${p}" aria-label="Go to page ${p}" ${p===filters.page?'aria-current="page"':''}>${p}</button>`).join('')}
+      </div>
+      <button class="btn btn-ghost btn-sm" id="nextPage" ${filters.page===totalPages?'style="opacity:.4;pointer-events:none"':''}>Next</button>
     </div>` : ''}`
     : emptyState(active?'No matching expenses':'No expenses yet', active?'Try clearing the search or filter.':'Add your first expense to get started.', active?null:'Add expense')}
   `;
@@ -808,6 +831,7 @@ function renderExpenses(){
   if($('#goDeleted')) $('#goDeleted').onclick=()=>go('deleted');
   if($('#prevPage')) $('#prevPage').onclick=()=>{ if(filters.page>1){ filters.page--; renderExpenses(); window.scrollTo(0,0); } };
   if($('#nextPage')) $('#nextPage').onclick=()=>{ if(filters.page<totalPages){ filters.page++; renderExpenses(); window.scrollTo(0,0); } };
+  document.querySelectorAll('[data-page]').forEach(b=>b.onclick=()=>{ const p=+b.dataset.page; if(p!==filters.page){ filters.page=p; renderExpenses(); window.scrollTo(0,0); } });
   document.querySelectorAll('[data-edit]').forEach(b=>b.onclick=()=>openEditModal(b.dataset.edit));
   document.querySelectorAll('[data-del]').forEach(b=>b.onclick=()=>confirmDelete(b.dataset.del));
   const addEmpty=$('#view').querySelector('.empty .btn'); if(addEmpty) addEmpty.onclick=openAddModal;
