@@ -3,7 +3,8 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Futsal Ledger — Expense Tracker</title>
+<title>Futsal Ledger</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='8' fill='%2333cf8f'/><g transform='translate(4 4)' fill='none' stroke='%230b201a' stroke-width='2'><circle cx='12' cy='12' r='9'/><path d='M12 7l3.5 2.5-1.3 4.1h-4.4L8.5 9.5 12 7z' fill='%230b201a' stroke='none'/><path d='M12 3v4M3.5 9l3.5 1M20.5 9l-3.5 1M6 19l2-3M18 19l-2-3'/></g></svg>" />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;500;600;700&family=Poppins:wght@500;600;700&display=swap" rel="stylesheet" />
@@ -618,7 +619,7 @@ const NAV = [
   {id:'settings',  label:'Settings',  icon:I.gear},
 ];
 let route = 'dashboard';
-let filters = {q:'', cat:'', period:'all', page:1};
+let filters = {q:'', cat:'', period:'all', sort:'newest', page:1};
 const EXPENSES_PER_PAGE = 15;
 
 function renderNav(){
@@ -628,7 +629,7 @@ function renderNav(){
   $('#navMobile').innerHTML = html;
   document.querySelectorAll('[data-route]').forEach(b=>b.onclick=()=>go(b.dataset.route));
 }
-function go(r){ route=r; filters={q:'',cat:'',period:'all',page:1}; renderNav(); render(); window.scrollTo(0,0); }
+function go(r){ route=r; filters={q:'',cat:'',period:'all',sort:'newest',page:1}; renderNav(); render(); window.scrollTo(0,0); }
 
 /* ===================== Router ===================== */
 const TITLES={dashboard:'Dashboard',expenses:'Expenses',engineer:'Engineer Expenses',fund:'Fund & Deposits',settings:'Settings',deleted:'Deleted Expenses'};
@@ -789,8 +790,14 @@ function donut(data, tot){
 }
 
 /* ===================== Expenses ===================== */
+const EXP_SORTERS={
+  newest:(a,b)=> b.date.localeCompare(a.date) || b.createdAt-a.createdAt,
+  oldest:(a,b)=> a.date.localeCompare(b.date) || a.createdAt-b.createdAt,
+  high:(a,b)=> b.amount-a.amount || b.date.localeCompare(a.date),
+  low:(a,b)=> a.amount-b.amount || b.date.localeCompare(a.date),
+};
 function renderExpenses(){
-  let list=activeExpenses().sort((a,b)=> b.date.localeCompare(a.date) || b.createdAt-a.createdAt);
+  let list=activeExpenses().sort(EXP_SORTERS[filters.sort]||EXP_SORTERS.newest);
   const q=filters.q.toLowerCase();
   if(q) list=list.filter(e=>(e.item+' '+(e.note||'')).toLowerCase().includes(q));
   if(filters.cat) list=list.filter(e=>e.category===filters.cat);
@@ -817,6 +824,12 @@ function renderExpenses(){
         <option value="today" ${filters.period==='today'?'selected':''}>Today</option>
         <option value="week" ${filters.period==='week'?'selected':''}>This week</option>
         <option value="month" ${filters.period==='month'?'selected':''}>This month</option>
+      </select>
+      <select class="filter" id="fsort" aria-label="Sort expenses">
+        <option value="newest" ${filters.sort==='newest'?'selected':''}>Newest first</option>
+        <option value="oldest" ${filters.sort==='oldest'?'selected':''}>Oldest first</option>
+        <option value="high" ${filters.sort==='high'?'selected':''}>Amount: high to low</option>
+        <option value="low" ${filters.sort==='low'?'selected':''}>Amount: low to high</option>
       </select>
       <button class="btn btn-ghost btn-sm" id="goDeleted">${svg(I.trash)} Deleted${delCount?' ('+delCount+')':''}</button>
     </div>
@@ -858,6 +871,7 @@ function renderExpenses(){
   const qi=$('#q'); if(qi){ qi.oninput=()=>{filters.q=qi.value; filters.page=1; const p=qi.selectionStart; renderExpenses(); const nn=$('#q'); nn.focus(); nn.setSelectionRange(p,p);}; }
   if($('#fcat')) $('#fcat').onchange=e=>{filters.cat=e.target.value; filters.page=1; renderExpenses();};
   if($('#fperiod')) $('#fperiod').onchange=e=>{filters.period=e.target.value; filters.page=1; renderExpenses();};
+  if($('#fsort')) $('#fsort').onchange=e=>{filters.sort=e.target.value; filters.page=1; renderExpenses();};
   if($('#goDeleted')) $('#goDeleted').onclick=()=>go('deleted');
   if($('#prevPage')) $('#prevPage').onclick=()=>{ if(filters.page>1){ filters.page--; renderExpenses(); window.scrollTo(0,0); } };
   if($('#nextPage')) $('#nextPage').onclick=()=>{ if(filters.page<totalPages){ filters.page++; renderExpenses(); window.scrollTo(0,0); } };
