@@ -18,8 +18,13 @@ create table if not exists public.deposits (
   id      text primary key,
   date    text not null,           -- 'YYYY-MM-DD'
   amount  numeric not null,
+  name    text default '',         -- who deposited (partner name)
+  method  text default '',         -- Cash | Bank deposit | Bank transfer | Cheque | Other
   note    text default ''
 );
+-- If the deposits table already exists, add the new columns:
+alter table public.deposits add column if not exists name   text default '';
+alter table public.deposits add column if not exists method text default '';
 
 -- Expenses: each cost, deducted from the fund (soft-deleted ones kept as a record)
 create table if not exists public.expenses (

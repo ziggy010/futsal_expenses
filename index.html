@@ -263,6 +263,18 @@
   .fund-row .meta .t{font-weight:600}
   .fund-row .meta .d{font-size:12.5px;color:var(--text-dim);margin-top:2px}
   .fund-row .v{font-family:'Poppins';font-weight:700;color:var(--accent);white-space:nowrap}
+  .fund-row .meta .t{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .fund-row .meta .t .tag{font-size:11px;font-weight:600;color:var(--text-dim);background:var(--surface-3);
+    border:1px solid var(--border);padding:2px 8px;border-radius:99px}
+  .contrib{display:flex;flex-direction:column;gap:15px;margin-top:4px}
+  .contrib-row{display:flex;flex-direction:column;gap:7px}
+  .contrib-head{display:flex;justify-content:space-between;align-items:baseline;gap:12px}
+  .contrib-head .nm{font-weight:600;font-size:14px}
+  .contrib-head .amt{font-family:'Poppins';font-weight:700;white-space:nowrap}
+  .contrib-head .amt .pct{font-family:inherit;font-weight:500;font-size:12px;color:var(--text-dimmer);margin-left:4px}
+  .contrib-track{height:9px;border-radius:99px;background:var(--surface-3);overflow:hidden}
+  .contrib-track > span{display:block;height:100%;border-radius:99px;background:var(--accent);
+    transition:width .5s var(--ease)}
 
   /* ---------- Toast ---------- */
   .toast-wrap{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);z-index:200;display:flex;
@@ -401,7 +413,7 @@ function defaultState(){
   return {
     projectName:'Futsal Ledger',
     currency:'Rs',
-    deposits:[{id:uid(), date:todayStr(), amount:2500000, note:'Opening fund (pooled in bank)'}],
+    deposits:[{id:uid(), date:todayStr(), amount:2500000, name:'', method:'Bank deposit', note:'Opening fund (pooled in bank)'}],
     expenses:[],
     engineerExpenses:[],
   };
@@ -445,8 +457,8 @@ const expRow = e => ({id:e.id,date:e.date,item:e.item,category:e.category,amount
 const expFromRow = r => ({id:r.id,date:r.date,item:r.item,category:r.category,amount:Number(r.amount),note:r.note||'',createdAt:Number(r.created_at)||Date.now(),deleted:!!r.deleted,deletedAt:r.deleted_at?Number(r.deleted_at):null,receiptUrl:r.receipt_url||null});
 const engRow = e => ({id:e.id,date:e.date,item:e.item,category:e.category,amount:e.amount,note:e.note||'',created_at:e.createdAt||Date.now()});
 const engFromRow = r => ({id:r.id,date:r.date,item:r.item,category:r.category,amount:Number(r.amount),note:r.note||'',createdAt:Number(r.created_at)||Date.now()});
-const depRow = d => ({id:d.id,date:d.date,amount:d.amount,note:d.note||''});
-const depFromRow = r => ({id:r.id,date:r.date,amount:Number(r.amount),note:r.note||''});
+const depRow = d => ({id:d.id,date:d.date,amount:d.amount,name:d.name||'',method:d.method||'',note:d.note||''});
+const depFromRow = r => ({id:r.id,date:r.date,amount:Number(r.amount),name:r.name||'',method:r.method||'',note:r.note||''});
 
 function cloudPush(table,row){
   if(!sb) return;
@@ -568,6 +580,15 @@ const totalSpent = () => activeExpenses().reduce((s,e)=>s+e.amount,0);
 const totalFund  = () => state.deposits.reduce((s,d)=>s+d.amount,0);
 const balance    = () => totalFund() - totalSpent();
 const totalEngineer = () => (state.engineerExpenses||[]).reduce((s,e)=>s+e.amount,0);
+// who deposited — fall back to legacy note when name is missing
+const depName = d => (d.name && d.name.trim()) || (d.note && d.note.trim()) || 'Deposit';
+const partnerNames = () => [...new Set(state.deposits.map(d=>(d.name||'').trim()).filter(Boolean))].sort();
+// total pooled per person, largest first
+const contributions = () => {
+  const m=new Map();
+  state.deposits.forEach(d=>{ const n=depName(d); m.set(n,(m.get(n)||0)+d.amount); });
+  return [...m.entries()].map(([name,amt])=>({name,amt})).sort((a,b)=>b.amt-a.amt);
+};
 
 /* ===================== Toast ===================== */
 function toast(msg, type='ok'){
@@ -930,6 +951,8 @@ function catPill(id){ const c=catOf(id);
 function renderFund(){
   const fund=totalFund(), spent=totalSpent(), bal=balance();
   const deposits=[...state.deposits].sort((a,b)=> b.date.localeCompare(a.date));
+  const contrib=contributions();
+  const maxC=Math.max(...contrib.map(c=>c.amt),1);
 
   $('#view').innerHTML = `
     <div class="strip">
@@ -937,6 +960,18 @@ function renderFund(){
       ${stripCell('Total Spent', cur(spent), 'across all expenses')}
       ${stripCell('Balance', cur(bal), bal>=0?'remaining in bank':'over budget')}
     </div>
+
+    ${contrib.length? `<div class="card" style="margin-bottom:20px">
+      <div class="section-head">
+        <div><h3>Total Deposited by Partner</h3><div class="sub" style="margin-top:3px">How much each person has pooled into the fund</div></div>
+      </div>
+      <div class="contrib">
+        ${contrib.map(c=>`<div class="contrib-row">
+          <div class="contrib-head"><span class="nm">${esc(c.name)}</span><span class="amt tnum">${cur(c.amt)} <span class="pct">${Math.round(c.amt/fund*100)}%</span></span></div>
+          <div class="contrib-track"><span style="width:${(c.amt/maxC*100).toFixed(1)}%"></span></div>
+        </div>`).join('')}
+      </div>
+    </div>` : ''}
 
     <div class="card">
       <div class="section-head">
@@ -946,8 +981,8 @@ function renderFund(){
       ${deposits.length? deposits.map(d=>`<div class="fund-row">
         <div class="ic">${svg(I.coins)}</div>
         <div class="meta">
-          <div class="t">${esc(d.note||'Deposit')}</div>
-          <div class="d">${fmtDate(d.date)}</div>
+          <div class="t">${esc(depName(d))}${d.method?`<span class="tag">${esc(d.method)}</span>`:''}</div>
+          <div class="d">${fmtDate(d.date)}${d.note?' · '+esc(d.note):''}</div>
         </div>
         <div class="v tnum">+ ${cur(d.amount)}</div>
         <button class="icon-btn" data-depedit="${d.id}" aria-label="Edit deposit">${svg(I.edit)}</button>
@@ -1173,6 +1208,19 @@ function openDepositModal(id){
     <div class="modal-body">
       <div class="row2">
         <div class="field">
+          <label for="dName">Deposited by <span class="req">*</span></label>
+          <input id="dName" list="partnerList" placeholder="e.g. Risab" value="${d?esc(d.name||''):''}"/>
+          <datalist id="partnerList">${partnerNames().map(n=>`<option value="${esc(n)}"></option>`).join('')}</datalist>
+        </div>
+        <div class="field">
+          <label for="dMethod">Method</label>
+          <select id="dMethod">
+            ${['Bank deposit','Cash','Bank transfer','Cheque','Other'].map(m=>`<option value="${m}"${(d?d.method:'Bank deposit')===m?' selected':''}>${m}</option>`).join('')}
+          </select>
+        </div>
+      </div>
+      <div class="row2">
+        <div class="field">
           <label for="dDate">Date <span class="req">*</span></label>
           <input type="date" id="dDate" value="${d?d.date:todayStr()}" max="${todayStr()}"/>
         </div>
@@ -1195,16 +1243,17 @@ function openDepositModal(id){
   $('#dClose').onclick=closeModal; $('#dCancel').onclick=closeModal;
   $('#dSave').onclick=saveDeposit;
   openScrim();
-  setTimeout(()=>{const a=$('#dAmt'); if(a&&!isEdit) a.focus();},120);
+  setTimeout(()=>{const a=$('#dName'); if(a&&!isEdit) a.focus();},120);
 }
 function saveDeposit(){
-  const date=$('#dDate').value, amount=parseFloat($('#dAmt').value), note=$('#dNote').value.trim();
-  if(!date || !(amount>0)){ $('#errDep').classList.add('show'); toast('Enter a date and amount','err'); return; }
+  const date=$('#dDate').value, amount=parseFloat($('#dAmt').value),
+        name=$('#dName').value.trim(), method=$('#dMethod').value, note=$('#dNote').value.trim();
+  if(!name || !date || !(amount>0)){ $('#errDep').classList.add('show'); toast('Enter who deposited, a date and amount','err'); return; }
   if(editingDepId){
-    const d=state.deposits.find(x=>x.id===editingDepId); d.date=date; d.amount=amount; d.note=note;
+    const d=state.deposits.find(x=>x.id===editingDepId); d.date=date; d.amount=amount; d.name=name; d.method=method; d.note=note;
     save(); cloudPush('deposits',depRow(d)); closeModal(); render(); toast('Deposit updated');
   }else{
-    const d={id:uid(), date, amount, note}; state.deposits.push(d);
+    const d={id:uid(), date, amount, name, method, note}; state.deposits.push(d);
     save(); cloudPush('deposits',depRow(d)); closeModal(); render(); toast('Deposit added');
   }
 }
@@ -1269,7 +1318,7 @@ function exportJSON(){
 function exportCSV(){
   const rows=[['Type','Date','Item/Note','Category','Amount']];
   [...state.deposits].sort((a,b)=>a.date.localeCompare(b.date)).forEach(d=>
-    rows.push(['Deposit', d.date, d.note||'Deposit', '', d.amount]));
+    rows.push(['Deposit', d.date, depName(d)+(d.note?' ('+d.note+')':''), d.method||'', d.amount]));
   activeExpenses().sort((a,b)=>a.date.localeCompare(b.date)).forEach(e=>
     rows.push(['Expense', e.date, e.item+(e.note?' ('+e.note+')':''), catOf(e.category).name, -e.amount]));
   [...(state.engineerExpenses||[])].sort((a,b)=>a.date.localeCompare(b.date)).forEach(e=>
