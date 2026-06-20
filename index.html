@@ -266,15 +266,20 @@
   .fund-row .meta .t{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
   .fund-row .meta .t .tag{font-size:11px;font-weight:600;color:var(--text-dim);background:var(--surface-3);
     border:1px solid var(--border);padding:2px 8px;border-radius:99px}
-  .contrib{display:flex;flex-direction:column;gap:15px;margin-top:4px}
-  .contrib-row{display:flex;flex-direction:column;gap:7px}
-  .contrib-head{display:flex;justify-content:space-between;align-items:baseline;gap:12px}
-  .contrib-head .nm{font-weight:600;font-size:14px}
-  .contrib-head .amt{font-family:'Poppins';font-weight:700;white-space:nowrap}
-  .contrib-head .amt .pct{font-family:inherit;font-weight:500;font-size:12px;color:var(--text-dimmer);margin-left:4px}
-  .contrib-track{height:9px;border-radius:99px;background:var(--surface-3);overflow:hidden}
-  .contrib-track > span{display:block;height:100%;border-radius:99px;background:var(--accent);
-    transition:width .5s var(--ease)}
+  .split-bar{display:flex;gap:3px;height:15px;border-radius:99px;overflow:hidden;
+    margin:6px 0 22px;background:var(--surface-3)}
+  .split-bar .seg{min-width:5px;transition:flex .55s var(--ease)}
+  .part-list{list-style:none;display:flex;flex-direction:column;gap:1px}
+  .part-row{display:flex;align-items:center;gap:13px;padding:9px 7px;border-radius:12px;
+    transition:background .16s var(--ease)}
+  .part-row:hover{background:var(--surface-3)}
+  .part-row .ava{width:35px;height:35px;border-radius:50%;flex:none;display:grid;place-items:center;
+    font-weight:700;font-size:13px;letter-spacing:.3px;color:var(--c);
+    background:color-mix(in oklch, var(--c) 16%, transparent);
+    border:1px solid color-mix(in oklch, var(--c) 38%, transparent)}
+  .part-row .nm{font-weight:600;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .part-row .amt{font-family:'Poppins';font-weight:700;white-space:nowrap}
+  .part-row .pc{font-family:'Poppins';font-weight:600;font-size:13px;width:48px;text-align:right}
 
   /* ---------- Toast ---------- */
   .toast-wrap{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);z-index:200;display:flex;
@@ -583,6 +588,10 @@ const totalEngineer = () => (state.engineerExpenses||[]).reduce((s,e)=>s+e.amoun
 // who deposited — fall back to legacy note when name is missing
 const depName = d => (d.name && d.name.trim()) || (d.note && d.note.trim()) || 'Deposit';
 const partnerNames = () => [...new Set(state.deposits.map(d=>(d.name||'').trim()).filter(Boolean))].sort();
+// distinct dark-mode-tuned hues, assigned by contribution rank (green accent leads)
+const PARTNER_COLORS=['oklch(0.74 0.16 155)','oklch(0.76 0.13 200)','oklch(0.71 0.13 250)','oklch(0.74 0.15 300)','oklch(0.80 0.13 80)','oklch(0.72 0.16 20)','oklch(0.82 0.16 130)'];
+const partnerColor = i => PARTNER_COLORS[i % PARTNER_COLORS.length];
+const initials = name => name.trim().split(/\s+/).slice(0,2).map(w=>w[0]||'').join('').toUpperCase()||'?';
 // total pooled per person, largest first
 const contributions = () => {
   const m=new Map();
@@ -952,7 +961,6 @@ function renderFund(){
   const fund=totalFund(), spent=totalSpent(), bal=balance();
   const deposits=[...state.deposits].sort((a,b)=> b.date.localeCompare(a.date));
   const contrib=contributions();
-  const maxC=Math.max(...contrib.map(c=>c.amt),1);
 
   $('#view').innerHTML = `
     <div class="strip">
@@ -963,14 +971,19 @@ function renderFund(){
 
     ${contrib.length? `<div class="card" style="margin-bottom:20px">
       <div class="section-head">
-        <div><h3>Total Deposited by Partner</h3><div class="sub" style="margin-top:3px">How much each person has pooled into the fund</div></div>
+        <div><h3>Total Deposited by Partner</h3><div class="sub" style="margin-top:3px">${contrib.length} partner${contrib.length!==1?'s':''} · ${cur(fund)} pooled into the fund</div></div>
       </div>
-      <div class="contrib">
-        ${contrib.map(c=>`<div class="contrib-row">
-          <div class="contrib-head"><span class="nm">${esc(c.name)}</span><span class="amt tnum">${cur(c.amt)} <span class="pct">${Math.round(c.amt/fund*100)}%</span></span></div>
-          <div class="contrib-track"><span style="width:${(c.amt/maxC*100).toFixed(1)}%"></span></div>
-        </div>`).join('')}
+      <div class="split-bar" role="img" aria-label="Partner contribution split">
+        ${contrib.map((c,i)=>`<span class="seg" style="flex:${c.amt};background:${partnerColor(i)}" title="${esc(c.name)}: ${cur(c.amt)}"></span>`).join('')}
       </div>
+      <ul class="part-list">
+        ${contrib.map((c,i)=>`<li class="part-row">
+          <span class="ava" style="--c:${partnerColor(i)}">${esc(initials(c.name))}</span>
+          <span class="nm">${esc(c.name)}</span>
+          <span class="amt tnum">${cur(c.amt)}</span>
+          <span class="pc tnum" style="color:${partnerColor(i)}">${Math.round(c.amt/fund*100)}%</span>
+        </li>`).join('')}
+      </ul>
     </div>` : ''}
 
     <div class="card">
