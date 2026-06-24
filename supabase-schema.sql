@@ -4,14 +4,16 @@
 -- Access model: OPEN (anyone with the app link can read/write).
 -- ============================================================
 
--- Settings: a single shared row (project name + currency)
+-- Settings: a single shared row (project name + currency + custom categories)
 create table if not exists public.settings (
   id            int  primary key default 1,
   project_name  text not null default 'Futsal Ledger',
   currency      text not null default 'Rs',
+  categories_json jsonb,
   constraint settings_single_row check (id = 1)
 );
 insert into public.settings (id) values (1) on conflict (id) do nothing;
+alter table public.settings add column if not exists categories_json jsonb;
 
 -- Deposits: money pooled into the shared bank account
 create table if not exists public.deposits (
@@ -31,7 +33,7 @@ create table if not exists public.expenses (
   id          text primary key,
   date        text not null,       -- 'YYYY-MM-DD'
   item        text not null,
-  category    text not null,       -- materials | labor | equipment | transport | advance | misc
+  category    text not null,       -- category id from settings.categories_json
   amount      numeric not null,
   note        text default '',
   created_at  bigint default 0,    -- client timestamp, used for ordering within a day

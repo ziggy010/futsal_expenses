@@ -3,11 +3,14 @@
 -- Run this in Supabase → SQL Editor → Run (you already ran the base schema).
 -- ============================================================
 
--- 1. Soft-delete columns on expenses (deleted ones stay as a permanent record)
+-- 1. Shared custom categories on the settings row
+alter table public.settings add column if not exists categories_json jsonb;
+
+-- 2. Soft-delete columns on expenses (deleted ones stay as a permanent record)
 alter table public.expenses add column if not exists deleted    boolean not null default false;
 alter table public.expenses add column if not exists deleted_at bigint;
 
--- 2. Engineer expenses: tracked separately, never deducted from the fund
+-- 3. Engineer expenses: tracked separately, never deducted from the fund
 create table if not exists public.engineer_expenses (
   id          text primary key,
   date        text not null,

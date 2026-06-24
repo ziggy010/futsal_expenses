@@ -236,6 +236,19 @@
   .cat-chip .dot{width:9px;height:9px;border-radius:50%}
   .cat-chip:hover{border-color:var(--border-strong);color:var(--fg)}
   .cat-chip.sel{color:var(--fg);background:var(--surface-2);border-color:var(--border-strong)}
+  .cat-tools{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+  .cat-admin{display:flex;flex-direction:column;gap:10px}
+  .cat-admin-row{display:flex;align-items:center;gap:12px;padding:12px 14px;border:1px solid var(--border);
+    border-radius:12px;background:var(--surface-2)}
+  .cat-admin-row .meta{flex:1;min-width:0}
+  .cat-admin-row .meta .name{font-weight:600}
+  .cat-admin-row .meta .sub{font-size:12px;color:var(--text-dim);margin-top:3px}
+  .cat-color-row{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+  .cat-color-row input[type="color"]{width:52px;height:40px;padding:4px;cursor:pointer}
+  .cat-swatches{display:flex;gap:8px;flex-wrap:wrap}
+  .cat-swatch{width:24px;height:24px;border-radius:999px;border:2px solid transparent;box-shadow:inset 0 0 0 1px oklch(1 0 0 / .15)}
+  .cat-swatch.sel{border-color:var(--fg)}
+  .cat-preview{padding:14px;border-radius:12px;background:var(--surface-2);border:1px solid var(--border)}
   .lineitem{display:grid;grid-template-columns:1fr 130px 36px;gap:9px;margin-bottom:9px;align-items:start}
   .li-total{display:flex;justify-content:space-between;align-items:center;padding:12px 14px;background:var(--surface-2);
     border-radius:var(--radius-sm);margin-top:4px;font-weight:600}
@@ -401,7 +414,7 @@ const I = {
 const svg = (p,extra='') => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" ${extra}>${p}</svg>`;
 
 /* ===================== Categories ===================== */
-const CATEGORIES = [
+const DEFAULT_CATEGORIES = [
   {id:'materials', name:'Materials',       hex:'#2DD4BF'},
   {id:'labor',     name:'Labor',           hex:'#A3E635'},
   {id:'equipment', name:'Equipment',       hex:'#A78BFA'},
@@ -409,7 +422,66 @@ const CATEGORIES = [
   {id:'advance',   name:'Advance/Boarding',hex:'#FB7185'},
   {id:'misc',      name:'Miscellaneous',   hex:'#94A3B8'},
 ];
-const catOf = id => CATEGORIES.find(c=>c.id===id) || CATEGORIES[5];
+const CATEGORY_COLOR_PALETTE = ['#2DD4BF','#A3E635','#A78BFA','#FBBF24','#FB7185','#94A3B8','#F97316','#F59E0B','#22C55E','#38BDF8','#FB7185','#E879F9'];
+const cloneCategories = list => list.map(c=>({...c}));
+function normalizeHex(hex, fallback='#94A3B8'){
+  const value = String(hex||'').trim();
+  return /^#[0-9a-fA-F]{6}$/.test(value) ? value.toUpperCase() : fallback.toUpperCase();
+}
+function humanizeCategoryId(id){
+  return String(id||'').replace(/[-_]+/g,' ').replace(/\b\w/g, m=>m.toUpperCase()).trim();
+}
+function slugifyCategoryName(name){
+  return String(name||'').toLowerCase().trim().replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'');
+}
+function uniqueCategoryId(base, takenIds){
+  const used = takenIds instanceof Set ? takenIds : new Set(takenIds);
+  const stem = base || 'category';
+  let id = stem;
+  let n = 2;
+  while(used.has(id)){ id = `${stem}-${n++}`; }
+  return id;
+}
+function categoryFallbackHex(id){
+  const text = String(id||'misc');
+  let total = 0;
+  for(let i=0;i<text.length;i++) total += text.charCodeAt(i);
+  return CATEGORY_COLOR_PALETTE[total % CATEGORY_COLOR_PALETTE.length];
+}
+function normalizeCategories(list){
+  const items = Array.isArray(list) ? list : [];
+  const out = [];
+  const used = new Set();
+  items.forEach((raw, index)=>{
+    const name = String(raw && raw.name || '').trim();
+    if(!name) return;
+    const baseId = slugifyCategoryName(raw && raw.id || name) || `category-${index+1}`;
+    const id = uniqueCategoryId(baseId, used);
+    used.add(id);
+    out.push({id, name, hex:normalizeHex(raw && raw.hex, CATEGORY_COLOR_PALETTE[out.length % CATEGORY_COLOR_PALETTE.length])});
+  });
+  return out.length ? out : cloneCategories(DEFAULT_CATEGORIES);
+}
+function managedCategories(){ return normalizeCategories(state.categories); }
+function categoryList(){
+  const base = managedCategories();
+  const used = new Set(base.map(c=>c.id));
+  [...state.expenses, ...(state.engineerExpenses||[])].forEach(entry=>{
+    const id = String(entry && entry.category || '').trim();
+    if(id && !used.has(id)){
+      used.add(id);
+      base.push({id, name:humanizeCategoryId(id) || 'Uncategorized', hex:categoryFallbackHex(id)});
+    }
+  });
+  return base;
+}
+const firstCategoryId = () => (managedCategories()[0] || DEFAULT_CATEGORIES[0]).id;
+const catOf = id => categoryList().find(c=>c.id===id) || {id:id||'uncategorized', name:humanizeCategoryId(id)||'Uncategorized', hex:categoryFallbackHex(id)};
+const categoryUsageCount = id => [...state.expenses, ...(state.engineerExpenses||[])].filter(e=>e.category===id).length;
+function nextCategoryColor(){
+  const used = new Set(managedCategories().map(c=>normalizeHex(c.hex)));
+  return CATEGORY_COLOR_PALETTE.find(hex=>!used.has(hex.toUpperCase())) || CATEGORY_COLOR_PALETTE[managedCategories().length % CATEGORY_COLOR_PALETTE.length];
+}
 
 /* ===================== State ===================== */
 const LS_KEY = 'futsalLedger.v2';
@@ -419,6 +491,7 @@ function defaultState(){
   return {
     projectName:'Futsal Ledger',
     currency:'Rs',
+    categories:cloneCategories(DEFAULT_CATEGORIES),
     deposits:[{id:uid(), date:todayStr(), amount:2500000, name:'', method:'Bank deposit', note:'Opening fund (pooled in bank)'}],
     expenses:[],
     engineerExpenses:[],
@@ -431,6 +504,7 @@ function load(){
     const s = JSON.parse(raw);
     if(!Array.isArray(s.expenses) || !Array.isArray(s.deposits)) return defaultState();
     s.currency = s.currency || 'Rs';
+    s.categories = normalizeCategories(s.categories);
     s.engineerExpenses = Array.isArray(s.engineerExpenses) ? s.engineerExpenses : [];
     return s;
   }catch(e){ return defaultState(); }
@@ -443,6 +517,7 @@ function migrateOrDefault(){
       const s = defaultState();
       s.projectName = old.projectName || s.projectName;
       s.currency = old.currency || s.currency;
+      s.categories = cloneCategories(DEFAULT_CATEGORIES);
       s.expenses = old.expenses.map(e=>({id:e.id||uid(),date:e.date,item:e.item,category:e.category,amount:e.amount,note:e.note||'',createdAt:e.createdAt||Date.now()}));
       return s;
     }
@@ -465,6 +540,33 @@ const engRow = e => ({id:e.id,date:e.date,item:e.item,category:e.category,amount
 const engFromRow = r => ({id:r.id,date:r.date,item:r.item,category:r.category,amount:Number(r.amount),note:r.note||'',createdAt:Number(r.created_at)||Date.now()});
 const depRow = d => ({id:d.id,date:d.date,amount:d.amount,name:d.name||'',method:d.method||'',note:d.note||''});
 const depFromRow = r => ({id:r.id,date:r.date,amount:Number(r.amount),name:r.name||'',method:r.method||'',note:r.note||''});
+let cloudCategoryColumnAvailable = null;
+let cloudCategorySyncWarned = false;
+
+function isMissingCategoryColumn(error){
+  const msg = [error && error.message, error && error.details, error && error.hint, error && error.code].filter(Boolean).join(' ');
+  return /categories_json|schema cache|column/i.test(msg);
+}
+async function pushSettings(){
+  if(!sb) return;
+  const baseRow = {id:1,project_name:state.projectName,currency:state.currency};
+  const nextRow = cloudCategoryColumnAvailable===false ? baseRow : {...baseRow, categories_json:state.categories};
+  let {error} = await sb.from('settings').upsert(nextRow);
+  if(error && nextRow.categories_json && isMissingCategoryColumn(error)){
+    cloudCategoryColumnAvailable = false;
+    if(!cloudCategorySyncWarned){
+      cloudCategorySyncWarned = true;
+      toast('Run the new Supabase category migration to sync custom categories','err');
+    }
+    ({error} = await sb.from('settings').upsert(baseRow));
+  } else if(!error && nextRow.categories_json){
+    cloudCategoryColumnAvailable = true;
+  }
+  if(error){
+    console.error(error);
+    toast('Cloud save failed — check connection','err');
+  }
+}
 
 function cloudPush(table,row){
   if(!sb) return;
@@ -479,7 +581,7 @@ async function cloudReplaceAll(){
   await sb.from('expenses').delete().neq('id','');
   await sb.from('deposits').delete().neq('id','');
   await sb.from('engineer_expenses').delete().neq('id','');
-  await sb.from('settings').upsert({id:1,project_name:state.projectName,currency:state.currency});
+  await pushSettings();
   if(state.deposits.length) await sb.from('deposits').upsert(state.deposits.map(depRow));
   if(state.expenses.length) await sb.from('expenses').upsert(state.expenses.map(expRow));
   if(state.engineerExpenses.length) await sb.from('engineer_expenses').upsert(state.engineerExpenses.map(engRow));
@@ -496,7 +598,14 @@ async function cloudPull(initial){
   const localHas = state.expenses.length>0 || state.deposits.length>0;
   // First connection to an empty project: seed it from whatever is on this device.
   if(initial && cloudEmpty && localHas){ await cloudReplaceAll(); return; }
-  if(s.data){ state.projectName=s.data.project_name||state.projectName; state.currency=s.data.currency||state.currency; }
+  if(s.data){
+    state.projectName=s.data.project_name||state.projectName;
+    state.currency=s.data.currency||state.currency;
+    if(Array.isArray(s.data.categories_json)){
+      state.categories = normalizeCategories(s.data.categories_json);
+      cloudCategoryColumnAvailable = true;
+    }
+  }
   state.deposits = (d.data||[]).map(depFromRow);
   state.expenses = (e.data||[]).map(expFromRow);
   state.engineerExpenses = (g && !g.error) ? (g.data||[]).map(engFromRow) : (state.engineerExpenses||[]);
@@ -686,9 +795,10 @@ function renderDashboard(){
   }
 
   // category totals
-  const catTot={}; CATEGORIES.forEach(c=>catTot[c.id]=0);
+  const cats = categoryList();
+  const catTot={}; cats.forEach(c=>catTot[c.id]=0);
   exp.forEach(e=>catTot[e.category]=(catTot[e.category]||0)+e.amount);
-  const catData = CATEGORIES.map(c=>({...c,amt:catTot[c.id]})).filter(c=>c.amt>0).sort((a,b)=>b.amt-a.amt);
+  const catData = cats.map(c=>({...c,amt:catTot[c.id]})).filter(c=>c.amt>0).sort((a,b)=>b.amt-a.amt);
 
   // last 6 months (local components — avoid UTC shift)
   const months=[]; const base=new Date();
@@ -817,7 +927,7 @@ function renderExpenses(){
       <div class="search">${svg(I.search)}<input id="q" placeholder="Search item or note…" value="${esc(filters.q)}" aria-label="Search expenses"/></div>
       <select class="filter" id="fcat" aria-label="Filter by category">
         <option value="">All categories</option>
-        ${CATEGORIES.map(c=>`<option value="${c.id}" ${filters.cat===c.id?'selected':''}>${c.name}</option>`).join('')}
+        ${categoryList().map(c=>`<option value="${c.id}" ${filters.cat===c.id?'selected':''}>${c.name}</option>`).join('')}
       </select>
       <select class="filter" id="fperiod" aria-label="Filter by time period">
         <option value="all" ${filters.period==='all'?'selected':''}>All time</option>
@@ -1040,6 +1150,25 @@ function renderSettings(){
       <button class="btn btn-primary btn-sm" id="saveProject">${svg(I.check)} Save</button>
     </div>
 
+    <div class="card" style="margin-bottom:18px;max-width:580px">
+      <div class="section-head">
+        <div>
+          <h3>Categories</h3>
+          <div class="sub" style="margin-top:3px">Used in forms, filters, charts, exports, and history.</div>
+        </div>
+        <button class="btn btn-primary btn-sm" id="addCategorySetting">${svg(I.plus)} Add category</button>
+      </div>
+      <div class="cat-admin">
+        ${categoryList().map(c=>`<div class="cat-admin-row">
+          <div class="meta">
+            <div class="name">${catPill(c.id)}</div>
+            <div class="sub">${categoryUsageCount(c.id)} ${categoryUsageCount(c.id)===1?'entry':'entries'}</div>
+          </div>
+          <button class="icon-btn" data-cat-setting-edit="${c.id}" aria-label="Edit ${esc(c.name)}">${svg(I.edit)}</button>
+        </div>`).join('')}
+      </div>
+    </div>
+
     <div class="card" style="max-width:580px">
       <div class="section-head"><h3>Backup &amp; Data</h3></div>
       <p style="color:var(--text-dim);font-size:13.5px;margin-bottom:16px;line-height:1.6">
@@ -1056,11 +1185,13 @@ function renderSettings(){
       </div>
     </div>
   `;
-  $('#saveProject').onclick=()=>{
+  $('#saveProject').onclick=async()=>{
     state.projectName=$('#setName').value.trim()||'Futsal Ledger';
     state.currency=$('#setCur').value.trim()||'Rs';
-    save(); cloudPush('settings',{id:1,project_name:state.projectName,currency:state.currency}); render(); toast('Project settings saved');
+    save(); await pushSettings(); render(); toast('Project settings saved');
   };
+  $('#addCategorySetting').onclick=()=>openCategoryModal('add',{returnTo:'settings'});
+  document.querySelectorAll('[data-cat-setting-edit]').forEach(b=>b.onclick=()=>openCategoryModal('edit',{returnTo:'settings',categoryId:b.dataset.catSettingEdit}));
   $('#expJson').onclick=exportJSON;
   $('#expCsv').onclick=exportCSV;
   $('#impBtn').onclick=()=>$('#impFile').click();
@@ -1073,25 +1204,35 @@ let editingId=null;
 let lineItems=[];
 let receiptFile=null;   // newly picked photo (File)
 let receiptUrl=null;    // existing/kept photo URL
-
 let modalMode='main';   // 'main' | 'engineer'
-function openAddModal(){ modalMode='main'; editingId=null; lineItems=[{item:'',amount:''}]; renderExpenseModal(); }
+let modalCategoryId='';
+let expenseDraft={date:todayStr(), note:''};
+let categoryModalContext=null;
+
+function initExpenseModalState(entry){
+  lineItems = entry ? [{item:entry.item,amount:entry.amount}] : [{item:'',amount:''}];
+  receiptFile = null;
+  receiptUrl = entry && entry.receiptUrl || null;
+  expenseDraft = {date:entry ? entry.date : todayStr(), note:entry ? (entry.note||'') : ''};
+  modalCategoryId = entry && entry.category || firstCategoryId();
+}
+function openAddModal(){ modalMode='main'; editingId=null; initExpenseModalState(null); renderExpenseModal(); }
 function openEditModal(id){
   const e=state.expenses.find(x=>x.id===id); if(!e) return;
-  modalMode='main'; editingId=id; lineItems=[{item:e.item,amount:e.amount}];
-  renderExpenseModal(e);
+  modalMode='main'; editingId=id; initExpenseModalState(e); renderExpenseModal();
 }
-function openEngineerAddModal(){ modalMode='engineer'; editingId=null; lineItems=[{item:'',amount:''}]; renderExpenseModal(); }
+function openEngineerAddModal(){ modalMode='engineer'; editingId=null; initExpenseModalState(null); renderExpenseModal(); }
 function openEngineerEditModal(id){
   const e=(state.engineerExpenses||[]).find(x=>x.id===id); if(!e) return;
-  modalMode='engineer'; editingId=id; lineItems=[{item:e.item,amount:e.amount}];
-  renderExpenseModal(e);
+  modalMode='engineer'; editingId=id; initExpenseModalState(e); renderExpenseModal();
 }
 
-function renderExpenseModal(e=null){
+function renderExpenseModal(){
   const isEdit=!!editingId;
   const isEng=modalMode==='engineer';
   const noun=isEng?'Engineer Cost':'Expense';
+  const cats = categoryList();
+  if(!cats.some(c=>c.id===modalCategoryId)) modalCategoryId = (cats[0] || DEFAULT_CATEGORIES[0]).id;
   const m=$('#modal');
   m.innerHTML = `
     <div class="modal-head">
@@ -1101,14 +1242,18 @@ function renderExpenseModal(e=null){
     <div class="modal-body">
       <div class="field" style="margin-bottom:15px">
         <label for="mDate">Date <span class="req">*</span></label>
-        <input type="date" id="mDate" value="${e?e.date:todayStr()}" max="${todayStr()}"/>
+        <input type="date" id="mDate" value="${expenseDraft.date}" max="${todayStr()}"/>
         <div class="errmsg" id="errDate">Pick a date</div>
       </div>
       <div class="field">
         <label>Category <span class="req">*</span></label>
         <div class="cat-chips" id="mCats">
-          ${CATEGORIES.map(c=>`<button type="button" class="cat-chip ${ (e?e.category:'materials')===c.id?'sel':''}" data-cat="${c.id}">
+          ${cats.map(c=>`<button type="button" class="cat-chip ${modalCategoryId===c.id?'sel':''}" data-cat="${c.id}">
             <span class="dot" style="background:${c.hex}"></span>${c.name}</button>`).join('')}
+        </div>
+        <div class="cat-tools">
+          <button type="button" class="btn btn-ghost btn-sm" id="catAdd">${svg(I.plus,'width="14" height="14"')} Add category</button>
+          <button type="button" class="btn btn-ghost btn-sm" id="catEdit">${svg(I.edit,'width="14" height="14"')} Edit selected</button>
         </div>
       </div>
       <div class="field">
@@ -1120,7 +1265,7 @@ function renderExpenseModal(e=null){
       </div>
       <div class="field"${isEng?'':' style="margin-bottom:14px"'}>
         <label for="mNote">Note <span style="color:var(--text-dim);font-weight:400">(optional)</span></label>
-        <input id="mNote" placeholder="e.g. advance for boarding, first 2 tips…" value="${e?esc(e.note||''):''}"/>
+        <input id="mNote" placeholder="e.g. advance for boarding, first 2 tips…" value="${esc(expenseDraft.note)}"/>
       </div>
       ${isEng?'':`
       <div class="field" style="margin-bottom:4px">
@@ -1132,13 +1277,17 @@ function renderExpenseModal(e=null){
     </div>
     <div class="modal-foot">
       <button class="btn btn-ghost" id="mCancel">Cancel</button>
-      <button class="btn btn-primary" id="mSave">${svg(I.check)} ${isEdit?'Save changes':'Add expense'}</button>
+      <button class="btn btn-primary" id="mSave">${svg(I.check)} ${isEdit?'Save changes':(isEng?'Add engineer cost':'Add expense')}</button>
     </div>
   `;
-  let selCat = e?e.category:'materials';
   m.querySelectorAll('[data-cat]').forEach(b=>b.onclick=()=>{
-    selCat=b.dataset.cat; m.querySelectorAll('[data-cat]').forEach(x=>x.classList.toggle('sel',x===b));
+    modalCategoryId=b.dataset.cat;
+    m.querySelectorAll('[data-cat]').forEach(x=>x.classList.toggle('sel',x===b));
   });
+  $('#mDate').oninput=e=>{ expenseDraft.date=e.target.value; };
+  $('#mNote').oninput=e=>{ expenseDraft.note=e.target.value; };
+  $('#catAdd').onclick=()=>openCategoryModal('add',{returnTo:'expense'});
+  $('#catEdit').onclick=()=>openCategoryModal('edit',{returnTo:'expense',categoryId:modalCategoryId});
   function renderLines(){
     const wrap=$('#mLines');
     wrap.innerHTML=lineItems.map((li,i)=>`
@@ -1156,7 +1305,6 @@ function renderExpenseModal(e=null){
   if($('#addLine')) $('#addLine').onclick=()=>{lineItems.push({item:'',amount:''});renderLines();};
 
   // receipt photo (main expenses only)
-  receiptFile=null; receiptUrl=(e&&e.receiptUrl)||null;
   function renderReceiptBox(){
     const box=$('#rcptBox'); if(!box) return;
     const thumb = receiptFile? URL.createObjectURL(receiptFile) : receiptUrl;
@@ -1179,14 +1327,15 @@ function renderExpenseModal(e=null){
   if(ri){ ri.onchange=()=>{ if(ri.files&&ri.files[0]){ receiptFile=ri.files[0]; renderReceiptBox(); } ri.value=''; }; renderReceiptBox(); }
 
   $('#mClose').onclick=closeModal; $('#mCancel').onclick=closeModal;
-  $('#mSave').onclick=()=>saveExpense(selCat);
+  $('#mSave').onclick=saveExpense;
   openScrim();
   setTimeout(()=>{const f=$('#mLines [data-li-item]'); if(f && !isEdit) f.focus();},120);
 }
 
-async function saveExpense(category){
-  const date=$('#mDate').value;
-  const note=$('#mNote').value.trim();
+async function saveExpense(){
+  const date=expenseDraft.date;
+  const note=expenseDraft.note.trim();
+  const category=modalCategoryId;
   let ok=true;
   $('#errDate').classList.toggle('show', !date); if(!date) ok=false;
   const valid=lineItems.map(l=>({item:l.item.trim(),amount:parseFloat(l.amount)})).filter(l=>l.item && l.amount>0);
@@ -1219,6 +1368,106 @@ async function saveExpense(category){
     save(); cloudPush(table,added.map(rowFn)); closeModal(); render();
     toast(valid.length>1? valid.length+' items added' : noun+' added');
   }
+}
+
+function openCategoryModal(mode,{returnTo='settings',categoryId=null}={}){
+  const current = categoryId ? catOf(categoryId) : null;
+  categoryModalContext = {mode, returnTo, categoryId};
+  $('#modal').innerHTML = `
+    <div class="modal-head">
+      <h3>${mode==='edit'?'Edit category':'Add category'}</h3>
+      <button class="icon-btn" id="catModalClose" aria-label="Close">${svg(I.x)}</button>
+    </div>
+    <div class="modal-body">
+      <div class="field">
+        <label for="catName">Category name <span class="req">*</span></label>
+        <input id="catName" placeholder="e.g. Tiles, Paint, Food" value="${mode==='edit' && current ? esc(current.name) : ''}"/>
+        <div class="errmsg" id="catErrName">Enter a unique category name</div>
+      </div>
+      <div class="field">
+        <label for="catColor">Color</label>
+        <div class="cat-color-row">
+          <input type="color" id="catColor" value="${normalizeHex(mode==='edit' && current ? current.hex : nextCategoryColor())}"/>
+          <div class="cat-swatches">
+            ${CATEGORY_COLOR_PALETTE.map(hex=>`<button type="button" class="cat-swatch ${normalizeHex(mode==='edit' && current ? current.hex : nextCategoryColor())===hex.toUpperCase()?'sel':''}" data-swatch="${hex}" style="background:${hex}" aria-label="Choose ${hex}"></button>`).join('')}
+          </div>
+        </div>
+      </div>
+      <div class="field" style="margin-bottom:4px">
+        <label>Preview</label>
+        <div class="cat-preview" id="catPreview">${catPillPreview(mode==='edit' && current ? current.name : 'New category', normalizeHex(mode==='edit' && current ? current.hex : nextCategoryColor()))}</div>
+      </div>
+      ${mode==='edit' && categoryId ? `<div class="field" style="margin-bottom:0">
+        <div class="hint">This updates every place that uses <strong style="color:var(--fg)">${esc(current ? current.name : humanizeCategoryId(categoryId))}</strong>, including existing expenses, filters, charts, and exports.</div>
+      </div>` : ''}
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost" id="catCancel">Cancel</button>
+      <button class="btn btn-primary" id="catSave">${svg(I.check)} ${mode==='edit'?'Save changes':'Add category'}</button>
+    </div>
+  `;
+  const nameInput = $('#catName');
+  const colorInput = $('#catColor');
+  const preview = $('#catPreview');
+  function refreshPreview(){
+    preview.innerHTML = catPillPreview(nameInput.value.trim() || 'New category', normalizeHex(colorInput.value, nextCategoryColor()));
+    document.querySelectorAll('[data-swatch]').forEach(b=>b.classList.toggle('sel', normalizeHex(colorInput.value)===normalizeHex(b.dataset.swatch)));
+  }
+  colorInput.oninput = refreshPreview;
+  nameInput.oninput = ()=>{
+    $('#catErrName').classList.remove('show');
+    refreshPreview();
+  };
+  document.querySelectorAll('[data-swatch]').forEach(b=>b.onclick=()=>{
+    colorInput.value = normalizeHex(b.dataset.swatch);
+    refreshPreview();
+  });
+  $('#catModalClose').onclick=cancelCategoryModal;
+  $('#catCancel').onclick=cancelCategoryModal;
+  $('#catSave').onclick=saveCategoryModal;
+  openScrim();
+  setTimeout(()=>nameInput.focus(),120);
+}
+function cancelCategoryModal(){
+  const target = categoryModalContext && categoryModalContext.returnTo;
+  categoryModalContext = null;
+  if(target==='expense') renderExpenseModal();
+  else closeModal();
+}
+function catPillPreview(name, hex){
+  return `<span class="pill" style="background:${hex}22;color:${hex}"><span class="dot" style="background:${hex}"></span>${esc(name)}</span>`;
+}
+async function saveCategoryModal(){
+  if(!categoryModalContext) return;
+  const name = $('#catName').value.trim();
+  const hex = normalizeHex($('#catColor').value, nextCategoryColor());
+  const editId = categoryModalContext.mode==='edit' ? categoryModalContext.categoryId : null;
+  const duplicate = managedCategories().find(c=>c.name.toLowerCase()===name.toLowerCase() && c.id!==editId);
+  if(!name || duplicate){
+    $('#catErrName').classList.add('show');
+    toast(!name ? 'Enter a category name' : 'That category name already exists','err');
+    return;
+  }
+  const next = [...managedCategories()];
+  if(editId){
+    const idx = next.findIndex(c=>c.id===editId);
+    if(idx>=0) next[idx] = {...next[idx], name, hex};
+    else next.push({id:editId, name, hex});
+    modalCategoryId = editId;
+  } else {
+    const newId = uniqueCategoryId(slugifyCategoryName(name) || 'category', next.map(c=>c.id));
+    next.push({id:newId, name, hex});
+    modalCategoryId = newId;
+  }
+  state.categories = normalizeCategories(next);
+  save();
+  await pushSettings();
+  const target = categoryModalContext.returnTo;
+  const wasEdit = !!editId;
+  categoryModalContext = null;
+  if(target==='expense') renderExpenseModal();
+  else { closeModal(); render(); }
+  toast(wasEdit ? 'Category updated' : 'Category added');
 }
 
 /* ===================== Add / Edit deposit ===================== */
@@ -1322,8 +1571,8 @@ function showConfirm(title,msg,confirmLabel,onYes){
 /* ===================== Modal plumbing ===================== */
 function openScrim(){ $('#scrim').classList.add('open'); document.body.style.overflow='hidden'; }
 function closeModal(){ $('#scrim').classList.remove('open'); document.body.style.overflow=''; }
-$('#scrim').addEventListener('click',e=>{ if(e.target===$('#scrim')) closeModal(); });
-document.addEventListener('keydown',e=>{ if(e.key==='Escape') closeModal(); });
+$('#scrim').addEventListener('click',e=>{ if(e.target===$('#scrim')) categoryModalContext && categoryModalContext.returnTo==='expense' ? cancelCategoryModal() : closeModal(); });
+document.addEventListener('keydown',e=>{ if(e.key==='Escape') categoryModalContext && categoryModalContext.returnTo==='expense' ? cancelCategoryModal() : closeModal(); });
 document.addEventListener('click',e=>{ const c=e.target.closest('.rcpt-chip'); if(c){ e.stopPropagation(); openImage(c.dataset.rcpt); } });
 
 /* ===================== Export / Import ===================== */
@@ -1364,6 +1613,7 @@ function importJSON(ev){
       const data=JSON.parse(reader.result);
       if(!Array.isArray(data.expenses)||!Array.isArray(data.deposits)) throw new Error('bad');
       state=data; state.currency=state.currency||'Rs';
+      state.categories=normalizeCategories(state.categories);
       state.engineerExpenses=Array.isArray(data.engineerExpenses)?data.engineerExpenses:[];
       save(); cloudReplaceAll(); go('dashboard'); toast('Data imported');
     }catch(err){ toast('Invalid backup file','err'); }
