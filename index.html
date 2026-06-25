@@ -254,6 +254,18 @@
     border-radius:var(--radius-sm);margin-top:4px;font-weight:600}
   .li-total .v{font-family:'Poppins';font-weight:700;font-size:17px;color:var(--accent)}
   .link-add{color:var(--accent);font-weight:600;font-size:13px;display:inline-flex;align-items:center;gap:6px;padding:6px 0}
+  .log-list{display:flex;flex-direction:column;gap:12px}
+  .log-row{display:flex;gap:14px;padding:16px;border:1px solid var(--border);border-radius:14px;background:var(--surface-2)}
+  .log-date{width:96px;flex:none;padding:10px 12px;border-radius:12px;background:var(--surface-3);text-align:center}
+  .log-date .d{font-family:'Poppins';font-weight:700;font-size:20px;line-height:1}
+  .log-date .m{font-size:12px;color:var(--text-dim);font-weight:600;text-transform:uppercase;letter-spacing:.05em;margin-top:6px}
+  .log-main{flex:1;min-width:0}
+  .log-main .t{font-weight:700;font-size:16px}
+  .log-main .meta{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+  .log-main .meta .tag{font-size:12px;font-weight:600;color:var(--text-dim);background:var(--surface-3);
+    border:1px solid var(--border);padding:4px 9px;border-radius:999px}
+  .log-main .detail{margin-top:10px;font-size:14px;color:var(--text-dim);line-height:1.65;white-space:pre-wrap}
+  .log-actions{display:flex;gap:8px;align-self:flex-start}
   .rcpt-chip{display:inline-flex;align-items:center;justify-content:center;vertical-align:middle;margin-left:7px;width:24px;height:24px;
     border-radius:7px;background:var(--accent-soft);color:var(--accent);transition:background .15s}
   .rcpt-chip:hover{background:oklch(0.74 0.165 158 / .24)}
@@ -328,6 +340,10 @@
       color:var(--text-dim);font-weight:700;flex:none}
     .tbl td.actions{justify-content:flex-end}
     .note-cell{max-width:60%}
+    .log-row{flex-direction:column}
+    .log-date{width:100%;display:flex;justify-content:space-between;align-items:center;text-align:left}
+    .log-date .m{margin-top:0}
+    .log-actions{align-self:stretch;justify-content:flex-end}
     .mobile-nav{display:flex;position:fixed;bottom:0;left:0;right:0;z-index:40;background:oklch(0.185 0.013 165 / 0.96);
       backdrop-filter:blur(12px);border-top:1px solid var(--border);padding:8px 6px calc(8px + env(safe-area-inset-bottom))}
     .mobile-nav button{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;padding:6px;
@@ -403,6 +419,7 @@ const I = {
   trash:'<path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M10 11v6M14 11v6" stroke-linecap="round" stroke-linejoin="round"/>',
   x:'<path d="M18 6L6 18M6 6l12 12" stroke-linecap="round"/>',
   plus:'<path d="M12 5v14M5 12h14" stroke-linecap="round"/>',
+  clipboard:'<path d="M9 3h6a2 2 0 0 1 2 2v1h1a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h1V5a2 2 0 0 1 2-2z"/><path d="M9 6h6"/><path d="M8 11h8M8 15h6" stroke-linecap="round"/>',
   check:'<path d="M20 6L9 17l-5-5" stroke-linecap="round" stroke-linejoin="round"/>',
   alert:'<circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01" stroke-linecap="round"/>',
   download:'<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3" stroke-linecap="round" stroke-linejoin="round"/>',
@@ -495,6 +512,7 @@ function defaultState(){
     deposits:[{id:uid(), date:todayStr(), amount:2500000, name:'', method:'Bank deposit', note:'Opening fund (pooled in bank)'}],
     expenses:[],
     engineerExpenses:[],
+    dailyLogs:[],
   };
 }
 function load(){
@@ -506,6 +524,7 @@ function load(){
     s.currency = s.currency || 'Rs';
     s.categories = normalizeCategories(s.categories);
     s.engineerExpenses = Array.isArray(s.engineerExpenses) ? s.engineerExpenses : [];
+    s.dailyLogs = Array.isArray(s.dailyLogs) ? s.dailyLogs : [];
     return s;
   }catch(e){ return defaultState(); }
 }
@@ -540,12 +559,21 @@ const engRow = e => ({id:e.id,date:e.date,item:e.item,category:e.category,amount
 const engFromRow = r => ({id:r.id,date:r.date,item:r.item,category:r.category,amount:Number(r.amount),note:r.note||'',createdAt:Number(r.created_at)||Date.now()});
 const depRow = d => ({id:d.id,date:d.date,amount:d.amount,name:d.name||'',method:d.method||'',note:d.note||''});
 const depFromRow = r => ({id:r.id,date:r.date,amount:Number(r.amount),name:r.name||'',method:r.method||'',note:r.note||''});
+const logRow = l => ({id:l.id,date:l.date,title:l.title||'',details:l.details||'',labor_count:l.laborCount||0,completed:l.completed||'',note:l.note||'',created_at:l.createdAt||Date.now()});
+const logFromRow = r => ({id:r.id,date:r.date,title:r.title||'',details:r.details||'',laborCount:Number(r.labor_count)||0,completed:r.completed||'',note:r.note||'',createdAt:Number(r.created_at)||Date.now()});
 let cloudCategoryColumnAvailable = null;
 let cloudCategorySyncWarned = false;
+let cloudDailyLogsTableAvailable = null;
+let cloudDailyLogsWarned = false;
 
 function isMissingCategoryColumn(error){
   const msg = [error && error.message, error && error.details, error && error.hint, error && error.code].filter(Boolean).join(' ');
   return /categories_json|schema cache|column/i.test(msg);
+}
+function isMissingRelation(error, name){
+  const msg = [error && error.message, error && error.details, error && error.hint, error && error.code].filter(Boolean).join(' ');
+  const safe = String(name).replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+  return new RegExp(`relation[^\\n]*${safe}|table[^\\n]*${safe}|${safe}[^\\n]*does not exist`,'i').test(msg);
 }
 async function pushSettings(){
   if(!sb) return;
@@ -570,30 +598,78 @@ async function pushSettings(){
 
 function cloudPush(table,row){
   if(!sb) return;
-  sb.from(table).upsert(row).then(({error})=>{ if(error){console.error(error); toast('Cloud save failed — check connection','err');} });
+  if(table==='daily_logs' && cloudDailyLogsTableAvailable===false) return;
+  sb.from(table).upsert(row).then(({error})=>{
+    if(error){
+      if(table==='daily_logs' && isMissingRelation(error,'daily_logs')){
+        cloudDailyLogsTableAvailable = false;
+        if(!cloudDailyLogsWarned){
+          cloudDailyLogsWarned = true;
+          toast('Run the new Supabase daily log migration to sync logs','err');
+        }
+        return;
+      }
+      console.error(error); toast('Cloud save failed — check connection','err');
+    } else if(table==='daily_logs'){
+      cloudDailyLogsTableAvailable = true;
+    }
+  });
 }
 function cloudDel(table,id){
   if(!sb) return;
-  sb.from(table).delete().eq('id',id).then(({error})=>{ if(error){console.error(error); toast('Cloud delete failed','err');} });
+  if(table==='daily_logs' && cloudDailyLogsTableAvailable===false) return;
+  sb.from(table).delete().eq('id',id).then(({error})=>{
+    if(error){
+      if(table==='daily_logs' && isMissingRelation(error,'daily_logs')){
+        cloudDailyLogsTableAvailable = false;
+        if(!cloudDailyLogsWarned){
+          cloudDailyLogsWarned = true;
+          toast('Run the new Supabase daily log migration to sync logs','err');
+        }
+        return;
+      }
+      console.error(error); toast('Cloud delete failed','err');
+    } else if(table==='daily_logs'){
+      cloudDailyLogsTableAvailable = true;
+    }
+  });
 }
 async function cloudReplaceAll(){
   if(!sb) return;
   await sb.from('expenses').delete().neq('id','');
   await sb.from('deposits').delete().neq('id','');
   await sb.from('engineer_expenses').delete().neq('id','');
+  if(cloudDailyLogsTableAvailable!==false){
+    const {error} = await sb.from('daily_logs').delete().neq('id','');
+    if(error){
+      if(isMissingRelation(error,'daily_logs')){
+        cloudDailyLogsTableAvailable = false;
+        if(!cloudDailyLogsWarned){
+          cloudDailyLogsWarned = true;
+          toast('Run the new Supabase daily log migration to sync logs','err');
+        }
+      } else {
+        throw error;
+      }
+    } else {
+      cloudDailyLogsTableAvailable = true;
+    }
+  }
   await pushSettings();
   if(state.deposits.length) await sb.from('deposits').upsert(state.deposits.map(depRow));
   if(state.expenses.length) await sb.from('expenses').upsert(state.expenses.map(expRow));
   if(state.engineerExpenses.length) await sb.from('engineer_expenses').upsert(state.engineerExpenses.map(engRow));
+  if(state.dailyLogs.length && cloudDailyLogsTableAvailable!==false) await sb.from('daily_logs').upsert(state.dailyLogs.map(logRow));
 }
 async function cloudPull(initial){
-  const [s,d,e,g] = await Promise.all([
+  const [s,d,e,g,l] = await Promise.all([
     sb.from('settings').select('*').eq('id',1).maybeSingle(),
     sb.from('deposits').select('*'),
     sb.from('expenses').select('*'),
     sb.from('engineer_expenses').select('*'),
+    sb.from('daily_logs').select('*'),
   ]);
-  if(d.error||e.error) throw (d.error||e.error);
+  if(d.error||e.error|| (g && g.error && !isMissingRelation(g.error,'engineer_expenses')) ) throw (d.error||e.error||g.error);
   const cloudEmpty = (d.data||[]).length===0 && (e.data||[]).length===0;
   const localHas = state.expenses.length>0 || state.deposits.length>0;
   // First connection to an empty project: seed it from whatever is on this device.
@@ -609,6 +685,15 @@ async function cloudPull(initial){
   state.deposits = (d.data||[]).map(depFromRow);
   state.expenses = (e.data||[]).map(expFromRow);
   state.engineerExpenses = (g && !g.error) ? (g.data||[]).map(engFromRow) : (state.engineerExpenses||[]);
+  if(l && !l.error){
+    state.dailyLogs = (l.data||[]).map(logFromRow);
+    cloudDailyLogsTableAvailable = true;
+  } else if(l && l.error && isMissingRelation(l.error,'daily_logs')){
+    state.dailyLogs = Array.isArray(state.dailyLogs) ? state.dailyLogs : [];
+    cloudDailyLogsTableAvailable = false;
+  } else if(l && l.error){
+    throw l.error;
+  }
   save();
 }
 let _rt=null;
@@ -723,6 +808,7 @@ function toast(msg, type='ok'){
 const NAV = [
   {id:'dashboard', label:'Dashboard', icon:I.dash},
   {id:'expenses',  label:'Expenses',  icon:I.list},
+  {id:'dailylogs', label:'Daily Logs', icon:I.clipboard},
   {id:'engineer',  label:'Engineer',  icon:I.helmet},
   {id:'fund',      label:'Fund',      icon:I.bank},
   {id:'settings',  label:'Settings',  icon:I.gear},
@@ -741,13 +827,14 @@ function renderNav(){
 function go(r){ route=r; filters={q:'',cat:'',period:'all',sort:'newest',page:1}; renderNav(); render(); window.scrollTo(0,0); }
 
 /* ===================== Router ===================== */
-const TITLES={dashboard:'Dashboard',expenses:'Expenses',engineer:'Engineer Expenses',fund:'Fund & Deposits',settings:'Settings',deleted:'Deleted Expenses'};
+const TITLES={dashboard:'Dashboard',expenses:'Expenses',dailylogs:'Daily Logs',engineer:'Engineer Expenses',fund:'Fund & Deposits',settings:'Settings',deleted:'Deleted Expenses'};
 function render(){
   $('#pageTitle').textContent = TITLES[route];
   $('#brandName').textContent = state.projectName;
   updateTopbarAction();
   if(route==='dashboard') renderDashboard();
   else if(route==='expenses') renderExpenses();
+  else if(route==='dailylogs') renderDailyLogs();
   else if(route==='engineer') renderEngineer();
   else if(route==='fund') renderFund();
   else if(route==='settings') renderSettings();
@@ -759,6 +846,7 @@ function updateTopbarAction(){
   if(route==='deleted'){ ab.style.display='none'; return; }
   ab.style.display='';
   if(route==='engineer'){ if(lbl) lbl.textContent='Add Engineer Cost'; ab.onclick=openEngineerAddModal; }
+  else if(route==='dailylogs'){ if(lbl) lbl.textContent='Add Daily Log'; ab.onclick=()=>openDailyLogModal(null); }
   else { if(lbl) lbl.textContent='Add Expense'; ab.onclick=openAddModal; }
 }
 
@@ -1042,6 +1130,63 @@ function renderEngineer(){
   if($('#toExp')) $('#toExp').onclick=()=>go('expenses');
   document.querySelectorAll('[data-engedit]').forEach(b=>b.onclick=()=>openEngineerEditModal(b.dataset.engedit));
   document.querySelectorAll('[data-engdel]').forEach(b=>b.onclick=()=>confirmDeleteEngineer(b.dataset.engdel));
+}
+
+/* ===================== Daily Logs ===================== */
+function renderDailyLogs(){
+  const logs=[...(state.dailyLogs||[])].sort((a,b)=> b.date.localeCompare(a.date) || b.createdAt-a.createdAt);
+  const totalLogs=logs.length;
+  const totalLabors=logs.reduce((sum,l)=>sum+(l.laborCount||0),0);
+  const avgLabors=totalLogs ? Math.round((totalLabors/totalLogs)*10)/10 : 0;
+
+  $('#view').innerHTML = `
+    <div class="strip">
+      ${stripCell('Total Logs', totalLogs.toLocaleString('en-IN'), 'daily progress entries')}
+      ${stripCell('Labor Count', totalLabors.toLocaleString('en-IN'), 'combined across all logs')}
+      ${stripCell('Average Crew', totalLogs?String(avgLabors):'0', 'labors per logged day')}
+    </div>
+
+    <div class="card">
+      <div class="section-head">
+        <div>
+          <h3>Daily Site Logs</h3>
+          <div class="sub" style="margin-top:3px">Track what work happened each day, who showed up, and what got completed.</div>
+        </div>
+        <button class="btn btn-primary btn-sm" id="addLogInline">${svg(I.plus)} Add daily log</button>
+      </div>
+      ${logs.length ? `<div class="log-list">
+        ${logs.map(log=>{
+          const dt=parseLocalDate(log.date);
+          const day=String(dt.getDate()).padStart(2,'0');
+          const month=dt.toLocaleDateString('en-GB',{month:'short',year:'numeric'});
+          return `<div class="log-row">
+            <div class="log-date">
+              <div class="d">${day}</div>
+              <div class="m">${month}</div>
+            </div>
+            <div class="log-main">
+              <div class="t">${esc(log.title||'Daily update')}</div>
+              <div class="meta">
+                <span class="tag">${fmtDate(log.date)}</span>
+                <span class="tag">${log.laborCount||0} ${log.laborCount===1?'labor':'labors'}</span>
+                ${log.completed?`<span class="tag">Completed: ${esc(log.completed)}</span>`:''}
+              </div>
+              <div class="detail">${esc(log.details||'No work details added.')}</div>
+              ${log.note?`<div class="detail" style="margin-top:8px"><strong style="color:var(--fg)">Note:</strong> ${esc(log.note)}</div>`:''}
+            </div>
+            <div class="log-actions">
+              <button class="icon-btn" data-logedit="${log.id}" aria-label="Edit ${esc(log.title||'daily log')}">${svg(I.edit)}</button>
+              <button class="icon-btn" data-logdel="${log.id}" aria-label="Delete ${esc(log.title||'daily log')}">${svg(I.trash)}</button>
+            </div>
+          </div>`;
+        }).join('')}
+      </div>` : `<div class="empty">${svg(I.clipboard)}<h4>No daily logs yet</h4><p>Add a log for each workday so you can track what was done on site, how many labors came, and what progress was completed.</p><button class="btn btn-primary" id="addFirstLog">${svg(I.plus)} Add daily log</button></div>`}
+    </div>
+  `;
+  const addInline=$('#addLogInline'); if(addInline) addInline.onclick=()=>openDailyLogModal(null);
+  const addFirst=$('#addFirstLog'); if(addFirst) addFirst.onclick=()=>openDailyLogModal(null);
+  document.querySelectorAll('[data-logedit]').forEach(b=>b.onclick=()=>openDailyLogModal(b.dataset.logedit));
+  document.querySelectorAll('[data-logdel]').forEach(b=>b.onclick=()=>confirmDeleteDailyLog(b.dataset.logdel));
 }
 
 /* ===================== Deleted expenses (read-only archive) ===================== */
@@ -1470,6 +1615,79 @@ async function saveCategoryModal(){
   toast(wasEdit ? 'Category updated' : 'Category added');
 }
 
+/* ===================== Daily log modal ===================== */
+let editingLogId=null;
+function openDailyLogModal(id){
+  editingLogId=id;
+  const log = id ? (state.dailyLogs||[]).find(x=>x.id===id) : null;
+  const isEdit=!!log;
+  $('#modal').innerHTML = `
+    <div class="modal-head">
+      <h3>${isEdit?'Edit Daily Log':'Add Daily Log'}</h3>
+      <button class="icon-btn" id="logClose" aria-label="Close">${svg(I.x)}</button>
+    </div>
+    <div class="modal-body">
+      <div class="row2">
+        <div class="field">
+          <label for="logDate">Date <span class="req">*</span></label>
+          <input type="date" id="logDate" value="${log?log.date:todayStr()}" max="${todayStr()}"/>
+        </div>
+        <div class="field">
+          <label for="logLabor">How many labors <span class="req">*</span></label>
+          <input type="number" inputmode="numeric" min="0" id="logLabor" placeholder="e.g. 8" value="${log?log.laborCount:''}"/>
+        </div>
+      </div>
+      <div class="field">
+        <label for="logTitle">Work title <span class="req">*</span></label>
+        <input id="logTitle" placeholder="e.g. Brick wall on first floor" value="${log?esc(log.title||''):''}"/>
+      </div>
+      <div class="field">
+        <label for="logDetails">What work was done <span class="req">*</span></label>
+        <textarea id="logDetails" rows="5" placeholder="Describe the work completed today...">${log?esc(log.details||''):''}</textarea>
+      </div>
+      <div class="field">
+        <label for="logCompleted">Work completed / progress</label>
+        <input id="logCompleted" placeholder="e.g. 70% of plastering finished" value="${log?esc(log.completed||''):''}"/>
+      </div>
+      <div class="field" style="margin-bottom:4px">
+        <label for="logNote">Note <span style="color:var(--text-dim);font-weight:400">(optional)</span></label>
+        <textarea id="logNote" rows="3" placeholder="Weather, issues, materials pending, tomorrow plan...">${log?esc(log.note||''):''}</textarea>
+        <div class="errmsg" id="errLog">Please complete the required fields</div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost" id="logCancel">Cancel</button>
+      <button class="btn btn-primary" id="logSave">${svg(I.check)} ${isEdit?'Save changes':'Add daily log'}</button>
+    </div>
+  `;
+  $('#logClose').onclick=closeModal;
+  $('#logCancel').onclick=closeModal;
+  $('#logSave').onclick=saveDailyLog;
+  openScrim();
+  setTimeout(()=>{ const field=$('#logTitle'); if(field && !isEdit) field.focus(); },120);
+}
+function saveDailyLog(){
+  const date=$('#logDate').value;
+  const laborCount=parseInt($('#logLabor').value,10);
+  const title=$('#logTitle').value.trim();
+  const details=$('#logDetails').value.trim();
+  const completed=$('#logCompleted').value.trim();
+  const note=$('#logNote').value.trim();
+  const ok = !!date && !!title && !!details && Number.isFinite(laborCount) && laborCount>=0;
+  $('#errLog').classList.toggle('show', !ok);
+  if(!ok){ toast('Please complete the required fields','err'); return; }
+
+  if(editingLogId){
+    const log=state.dailyLogs.find(x=>x.id===editingLogId); if(!log) return;
+    log.date=date; log.laborCount=laborCount; log.title=title; log.details=details; log.completed=completed; log.note=note;
+    save(); cloudPush('daily_logs',logRow(log)); closeModal(); render(); toast('Daily log updated');
+  } else {
+    const log={id:uid(), date, laborCount, title, details, completed, note, createdAt:Date.now()};
+    state.dailyLogs.push(log);
+    save(); cloudPush('daily_logs',logRow(log)); closeModal(); render(); toast('Daily log added');
+  }
+}
+
 /* ===================== Add / Edit deposit ===================== */
 let editingDepId=null;
 function openDepositModal(id){
@@ -1551,6 +1769,11 @@ function confirmDeleteEngineer(id){
   showConfirm('Delete this engineer cost?', `"${esc(e.item)}" for ${cur(e.amount)} will be permanently removed.`,
     'Delete', ()=>{ state.engineerExpenses=state.engineerExpenses.filter(x=>x.id!==id); save(); cloudDel('engineer_expenses',id); render(); toast('Engineer cost deleted'); });
 }
+function confirmDeleteDailyLog(id){
+  const log=(state.dailyLogs||[]).find(x=>x.id===id); if(!log) return;
+  showConfirm('Delete this daily log?', `"${esc(log.title||'Daily log')}" from ${fmtDate(log.date)} will be permanently removed.`,
+    'Delete', ()=>{ state.dailyLogs=state.dailyLogs.filter(x=>x.id!==id); save(); cloudDel('daily_logs',id); render(); toast('Daily log deleted'); });
+}
 function confirmReset(){
   showConfirm('Reset all data?', 'This permanently deletes every expense and deposit, and resets the fund. Export a backup first if you want to keep your records.',
     'Reset everything', ()=>{ state=defaultState(); save(); cloudReplaceAll(); go('dashboard'); toast('All data reset'); });
@@ -1599,6 +1822,8 @@ function exportCSV(){
     rows.push(['Expense', e.date, e.item+(e.note?' ('+e.note+')':''), catOf(e.category).name, -e.amount]));
   [...(state.engineerExpenses||[])].sort((a,b)=>a.date.localeCompare(b.date)).forEach(e=>
     rows.push(['Engineer', e.date, e.item+(e.note?' ('+e.note+')':''), catOf(e.category).name, e.amount]));
+  [...(state.dailyLogs||[])].sort((a,b)=>a.date.localeCompare(b.date)).forEach(log=>
+    rows.push(['Daily Log', log.date, log.title + (log.details ? ' - ' + log.details : '') + (log.note ? ' ('+log.note+')' : ''), `Labors: ${log.laborCount||0}${log.completed ? ' | Completed: ' + log.completed : ''}`, '']));
   deletedExpenses().sort((a,b)=>a.date.localeCompare(b.date)).forEach(e=>
     rows.push(['Deleted', e.date, e.item+(e.note?' ('+e.note+')':''), catOf(e.category).name, e.amount]));
   const csv=rows.map(r=>r.map(c=>{const s=String(c); return /[",\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s;}).join(',')).join('\n');
@@ -1615,6 +1840,7 @@ function importJSON(ev){
       state=data; state.currency=state.currency||'Rs';
       state.categories=normalizeCategories(state.categories);
       state.engineerExpenses=Array.isArray(data.engineerExpenses)?data.engineerExpenses:[];
+      state.dailyLogs=Array.isArray(data.dailyLogs)?data.dailyLogs:[];
       save(); cloudReplaceAll(); go('dashboard'); toast('Data imported');
     }catch(err){ toast('Invalid backup file','err'); }
   };

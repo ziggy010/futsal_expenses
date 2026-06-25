@@ -26,3 +26,21 @@ drop policy if exists "open engineer" on public.engineer_expenses;
 create policy "open engineer" on public.engineer_expenses for all to anon, authenticated using (true) with check (true);
 
 alter publication supabase_realtime add table public.engineer_expenses;
+
+-- 4. Daily logs: site diary for work completed each day
+create table if not exists public.daily_logs (
+  id           text primary key,
+  date         text not null,
+  title        text not null default '',
+  details      text not null default '',
+  labor_count  int  not null default 0,
+  completed    text default '',
+  note         text default '',
+  created_at   bigint default 0
+);
+
+alter table public.daily_logs enable row level security;
+drop policy if exists "open daily logs" on public.daily_logs;
+create policy "open daily logs" on public.daily_logs for all to anon, authenticated using (true) with check (true);
+
+alter publication supabase_realtime add table public.daily_logs;

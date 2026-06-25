@@ -52,24 +52,40 @@ create table if not exists public.engineer_expenses (
   created_at  bigint default 0
 );
 
+-- Daily logs: site diary for work completed each day
+create table if not exists public.daily_logs (
+  id           text primary key,
+  date         text not null,
+  title        text not null default '',
+  details      text not null default '',
+  labor_count  int  not null default 0,
+  completed    text default '',
+  note         text default '',
+  created_at   bigint default 0
+);
+
 -- ---------- Row Level Security: open policies ----------
 alter table public.settings enable row level security;
 alter table public.deposits enable row level security;
 alter table public.expenses enable row level security;
 alter table public.engineer_expenses enable row level security;
+alter table public.daily_logs enable row level security;
 
 drop policy if exists "open settings" on public.settings;
 drop policy if exists "open deposits" on public.deposits;
 drop policy if exists "open expenses" on public.expenses;
 drop policy if exists "open engineer" on public.engineer_expenses;
+drop policy if exists "open daily logs" on public.daily_logs;
 
 create policy "open settings" on public.settings for all to anon, authenticated using (true) with check (true);
 create policy "open deposits" on public.deposits for all to anon, authenticated using (true) with check (true);
 create policy "open expenses" on public.expenses for all to anon, authenticated using (true) with check (true);
 create policy "open engineer" on public.engineer_expenses for all to anon, authenticated using (true) with check (true);
+create policy "open daily logs" on public.daily_logs for all to anon, authenticated using (true) with check (true);
 
 -- ---------- Realtime (live sync across devices) ----------
 alter publication supabase_realtime add table public.settings;
 alter publication supabase_realtime add table public.deposits;
 alter publication supabase_realtime add table public.expenses;
 alter publication supabase_realtime add table public.engineer_expenses;
+alter publication supabase_realtime add table public.daily_logs;
