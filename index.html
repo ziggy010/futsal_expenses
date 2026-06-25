@@ -30,7 +30,7 @@
     --danger-soft:oklch(0.64 0.2 25 / 0.13);
     --warning:oklch(0.78 0.14 78);
     /* Category hues (non-blue, money-forward) */
-    --c-materials:#2DD4BF; --c-labor:#A3E635; --c-equipment:#A78BFA;
+    --c-materials:#2DD4BF; --c-labor:#A3E635;
     --c-transport:#FBBF24; --c-advance:#FB7185; --c-misc:#94A3B8;
     --radius:15px; --radius-sm:10px;
     --shadow:0 14px 40px oklch(0.1 0.02 165 / 0.55);
@@ -434,12 +434,12 @@ const svg = (p,extra='') => `<svg viewBox="0 0 24 24" fill="none" stroke="curren
 const DEFAULT_CATEGORIES = [
   {id:'materials', name:'Materials',       hex:'#2DD4BF'},
   {id:'labor',     name:'Labor',           hex:'#A3E635'},
-  {id:'equipment', name:'Equipment',       hex:'#A78BFA'},
   {id:'transport', name:'Transport',       hex:'#FBBF24'},
   {id:'advance',   name:'Advance/Boarding',hex:'#FB7185'},
   {id:'misc',      name:'Miscellaneous',   hex:'#94A3B8'},
 ];
 const CATEGORY_COLOR_PALETTE = ['#2DD4BF','#A3E635','#A78BFA','#FBBF24','#FB7185','#94A3B8','#F97316','#F59E0B','#22C55E','#38BDF8','#FB7185','#E879F9'];
+const LEGACY_CATEGORY_MAP = {equipment:'materials'};
 const cloneCategories = list => list.map(c=>({...c}));
 function normalizeHex(hex, fallback='#94A3B8'){
   const value = String(hex||'').trim();
@@ -472,12 +472,39 @@ function normalizeCategories(list){
   items.forEach((raw, index)=>{
     const name = String(raw && raw.name || '').trim();
     if(!name) return;
-    const baseId = slugifyCategoryName(raw && raw.id || name) || `category-${index+1}`;
+    const rawId = String(raw && raw.id || name).trim();
+    const mappedId = LEGACY_CATEGORY_MAP[rawId] || rawId;
+    const baseId = slugifyCategoryName(mappedId || name) || `category-${index+1}`;
     const id = uniqueCategoryId(baseId, used);
     used.add(id);
     out.push({id, name, hex:normalizeHex(raw && raw.hex, CATEGORY_COLOR_PALETTE[out.length % CATEGORY_COLOR_PALETTE.length])});
   });
   return out.length ? out : cloneCategories(DEFAULT_CATEGORIES);
+}
+function applyLegacyCategoryMigration(s){
+  let changed = false;
+  const migratedExpenseIds = [];
+  const migratedEngineerIds = [];
+  (s.expenses||[]).forEach(entry=>{
+    const next = LEGACY_CATEGORY_MAP[entry.category];
+    if(next && entry.category!==next){
+      entry.category = next;
+      migratedExpenseIds.push(entry.id);
+      changed = true;
+    }
+  });
+  (s.engineerExpenses||[]).forEach(entry=>{
+    const next = LEGACY_CATEGORY_MAP[entry.category];
+    if(next && entry.category!==next){
+      entry.category = next;
+      migratedEngineerIds.push(entry.id);
+      changed = true;
+    }
+  });
+  const categoriesBefore = JSON.stringify(s.categories||[]);
+  s.categories = normalizeCategories((s.categories||[]).filter(c=>LEGACY_CATEGORY_MAP[c && c.id] !== 'materials'));
+  if(categoriesBefore !== JSON.stringify(s.categories||[])) changed = true;
+  return {changed, migratedExpenseIds, migratedEngineerIds};
 }
 function managedCategories(){ return normalizeCategories(state.categories); }
 function categoryList(){
@@ -522,9 +549,10 @@ function load(){
     const s = JSON.parse(raw);
     if(!Array.isArray(s.expenses) || !Array.isArray(s.deposits)) return defaultState();
     s.currency = s.currency || 'Rs';
-    s.categories = normalizeCategories(s.categories);
     s.engineerExpenses = Array.isArray(s.engineerExpenses) ? s.engineerExpenses : [];
     s.dailyLogs = Array.isArray(s.dailyLogs) ? s.dailyLogs : [];
+    const migration = applyLegacyCategoryMigration(s);
+    if(migration.changed) localStorage.setItem(LS_KEY, JSON.stringify(s));
     return s;
   }catch(e){ return defaultState(); }
 }
@@ -538,6 +566,7 @@ function migrateOrDefault(){
       s.currency = old.currency || s.currency;
       s.categories = cloneCategories(DEFAULT_CATEGORIES);
       s.expenses = old.expenses.map(e=>({id:e.id||uid(),date:e.date,item:e.item,category:e.category,amount:e.amount,note:e.note||'',createdAt:e.createdAt||Date.now()}));
+      applyLegacyCategoryMigration(s);
       return s;
     }
   }catch(e){}
@@ -694,7 +723,13 @@ async function cloudPull(initial){
   } else if(l && l.error){
     throw l.error;
   }
+  const migration = applyLegacyCategoryMigration(state);
   save();
+  if(migration.changed && sb){
+    if(migration.migratedExpenseIds.length) await sb.from('expenses').upsert(state.expenses.filter(x=>migration.migratedExpenseIds.includes(x.id)).map(expRow));
+    if(migration.migratedEngineerIds.length) await sb.from('engineer_expenses').upsert(state.engineerExpenses.filter(x=>migration.migratedEngineerIds.includes(x.id)).map(engRow));
+    await pushSettings();
+  }
 }
 let _rt=null;
 function cloudSubscribe(){
@@ -1838,9 +1873,9 @@ function importJSON(ev){
       const data=JSON.parse(reader.result);
       if(!Array.isArray(data.expenses)||!Array.isArray(data.deposits)) throw new Error('bad');
       state=data; state.currency=state.currency||'Rs';
-      state.categories=normalizeCategories(state.categories);
       state.engineerExpenses=Array.isArray(data.engineerExpenses)?data.engineerExpenses:[];
       state.dailyLogs=Array.isArray(data.dailyLogs)?data.dailyLogs:[];
+      applyLegacyCategoryMigration(state);
       save(); cloudReplaceAll(); go('dashboard'); toast('Data imported');
     }catch(err){ toast('Invalid backup file','err'); }
   };
